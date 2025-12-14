@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Doc Assistant — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen flex flex-col">
+  <header class="w-full shadow-sm">
+    <nav class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600" viewBox="0 0 24 24" fill="currentColor"
+          aria-hidden="true">
+          <path d="M12 2a7 7 0 00-7 7v3a3 3 0 003 3h1v3a1 1 0 001.447.894L13 18h2a3 3 0 003-3V9a7 7 0 00-7-7z" />
+        </svg>
+        <span class="text-lg font-semibold text-gray-800">AI Doc Assistant</span>
+      </div>
+      <div>
+        <button id="logoutBtn"
+          class="inline-block px-4 py-2 rounded-md border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">Logout</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center px-4 py-12">
+    <div class="w-full max-w-3xl">
+      <div class="bg-white rounded-2xl shadow-md p-8">
+        <h1 class="text-2xl font-bold text-gray-800">Upload your PDF portfolio</h1>
+        <p class="text-sm text-gray-600 mt-2">Only logged in users can upload PDFs. Use the form below to upload a PDF
+          file.</p>
+
+        <form id="uploadForm" class="mt-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Choose File (PDF or PPT)</label>
+            <input id="pdfInput" type="file" accept=".pdf, .ppt, .pptx, .docx" required class="mt-2" />
+          </div>
+          <div>
+            <button type="submit" class="px-4 py-2 rounded-md bg-indigo-600 text-white">Upload</button>
+          </div>
+        </form>
+
+        <div id="uploadsList" class="mt-6"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Chat Modal -->
+  <div id="chatModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col h-[500px]">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h3 id="chatTitle" class="font-bold text-lg">Chat</h3>
+        <button onclick="closeChat()" class="text-gray-500 hover:text-gray-700">&times;</button>
+      </div>
+      <div id="chatHistory" class="flex-1 p-4 overflow-y-auto space-y-2"></div>
+      <div class="p-4 border-t flex">
+        <input id="chatInput" type="text" class="flex-1 border rounded px-3 py-2 mr-2" placeholder="Ask a question..."
+          onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button onclick="sendMessage()"
+          class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="py-6 text-center text-xs text-gray-500">© <span id="year"></span> AI Doc Assistant</footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const API = "http://127.0.0.1:5001";
+
+    function getToken() { return localStorage.getItem('token'); }
+    function requireAuth() {
+      const t = getToken();
+      if (!t) {
+        alert('Not logged in — redirecting to login');
+        window.location.href = 'index.html';
+        return false;
+      }
+      return true;
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.href = 'index.html';
+    });
+
+    async function fetchUploads() {
+      if (!requireAuth()) return;
+      const res = await fetch(API + "/my-uploads", {
+        headers: { "Authorization": "Bearer " + getToken() }
+      });
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem('token');
+          window.location.href = 'index.html';
+          return;
+        }
+        return console.error('Failed to fetch uploads');
+      }
+      const data = await res.json();
+      const container = document.getElementById('uploadsList');
+      container.innerHTML = '<h3 class="font-medium">Your uploads</h3>';
+      if (data.uploads.length === 0) {
+        container.innerHTML += '<p class="text-sm text-gray-600 mt-2">No uploads yet.</p>';
+        return;
+      }
+      const ul = document.createElement('ul');
+      ul.className = 'mt-2 space-y-2';
+      data.uploads.forEach(u => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-lg';
+
+        const link = document.createElement('a');
+        link.href = API + '/uploads/' + u.filename;
+        link.className = 'text-indigo-600 hover:underline text-sm truncate';
+        link.target = '_blank';
+        link.textContent = u.originalname + ' (' + new Date(u.createdAt).toLocaleString() + ')';
+
+        const chatBtn = document.createElement('button');
+        chatBtn.textContent = 'Chat';
+        chatBtn.className = 'ml-4 px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700';
+        chatBtn.onclick = () => openChat(u._id, u.originalname);
+
+        li.appendChild(link);
+        li.appendChild(chatBtn);
+        ul.appendChild(li);
+      });
+      container.appendChild(ul);
+    }
+
+    // Chat Modal Logic
+    let currentFileId = null;
+    function openChat(fileId, filename) {
+      currentFileId = fileId;
+      document.getElementById('chatModal').classList.remove('hidden');
+      document.getElementById('chatTitle').textContent = 'Chat with ' + filename;
+      document.getElementById('chatHistory').innerHTML = '';
+    }
+
+    function closeChat() {
+      document.getElementById('chatModal').classList.add('hidden');
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const question = input.value.trim();
+      if (!question) return;
+
+      const history = document.getElementById('chatHistory');
+      history.innerHTML += `<div class="text-right text-gray-800 mb-2"><span class="bg-indigo-100 px-2 py-1 rounded inline-block">${question}</span></div>`;
+      input.value = '';
+
+      try {
+        history.innerHTML += `<div class="text-left text-gray-500 text-xs mb-2" id="loading">Thinking...</div>`;
+        const res = await fetch(API + '/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken()
+          },
+          body: JSON.stringify({ question, fileId: currentFileId })
+        });
+        document.getElementById('loading').remove();
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        history.innerHTML += `<div class="text-left text-gray-800 mb-2"><span class="bg-gray-200 px-2 py-1 rounded inline-block">${data.answer}</span></div>`;
+        history.scrollTop = history.scrollHeight;
+      } catch (err) {
+        alert('Chat error: ' + err.message);
+      }
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!requireAuth()) return;
+      const file = document.getElementById('pdfInput').files[0];
+      if (!file) return alert('Choose a file');
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const res = await fetch(API + "/upload", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + getToken() },
+          body: form
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.message || 'Upload failed');
+        alert('Upload successful');
+        fetchUploads();
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    });
+
+    // Serve uploaded files statically via relative path by backend; note: backend serves uploads folder at /uploads
+    // On load:
+    fetchUploads();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Doc Assistant — Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+  <header class="w-full shadow-sm">
+    <nav class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600" viewBox="0 0 24 24" fill="currentColor"
+          aria-hidden="true">
+          <path d="M12 2a7 7 0 00-7 7v3a3 3 0 003 3h1v3a1 1 0 001.447.894L13 18h2a3 3 0 003-3V9a7 7 0 00-7-7z" />
+        </svg>
+        <span class="text-lg font-semibold text-gray-800">AI Doc Assistant</span>
+      </div>
+      <div>
+        <a href="signup.html"
+          class="inline-block px-4 py-2 rounded-md border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">Sign
+          Up</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md">
+      <div class="bg-white rounded-2xl shadow-md p-8">
+        <h1 class="text-2xl font-bold text-gray-800 text-center">Welcome back</h1>
+        <p class="text-sm text-gray-600 mt-2 text-center">Sign in to access your AI Document Assistant</p>
+
+        <form class="mt-6 space-y-5" id="loginForm">
+          <div>
+            <label for="username" class="block text-sm font-medium text-gray-700">Username or Email</label>
+            <div class="mt-1">
+              <input id="username" name="username" type="text" required
+                class="block w-full px-3 py-2 rounded-md border border-gray-300" placeholder="username or email" />
+            </div>
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+            <div class="mt-1">
+              <input id="password" name="password" type="password" required
+                class="block w-full px-3 py-2 rounded-md border border-gray-300" placeholder="••••••••" />
+            </div>
+          </div>
+
+          <div>
+            <button type="submit" class="w-full px-4 py-2 rounded-md bg-indigo-600 text-white font-medium">Log
+              in</button>
+          </div>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-gray-600">
+          Don't have an account? <a href="signup.html" class="text-indigo-600 hover:underline">Sign up</a>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 text-center mt-3">Open <code>frontend/dashboard.html</code> after login to upload
+        PDFs.</p>
+    </div>
+  </main>
+
+  <footer class="py-6 text-center text-xs text-gray-500">© <span id="year"></span> AI Doc Assistant</footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const API = "http://127.0.0.1:5001";
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      try {
+        const res = await fetch(API + "/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.message || 'Login failed');
+        localStorage.setItem('token', data.token);
+        alert('Login successful — token saved. Opening dashboard...');
+        window.location.href = 'dashboard.html';
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    });
+  </script>
+</body>
+
+</html>
